@@ -33,6 +33,13 @@ test("an unknown lastActiveOrg falls back to the chat organization", () => {
   assert.equal(pickClaudeChatOrganization([API_ORG, CHAT_ORG], "lastActiveOrg=gone"), "org-chat");
 });
 
+test("lastActiveOrg pointing to an API-only organization still selects a chat organization", () => {
+  assert.equal(
+    pickClaudeChatOrganization([API_ORG, CHAT_ORG], "sessionKey=x; lastActiveOrg=org-api"),
+    "org-chat"
+  );
+});
+
 test("keeps the first organization when none advertises chat, and handles bad input", () => {
   assert.equal(pickClaudeChatOrganization([{ id: "only" }]), "only");
   assert.equal(pickClaudeChatOrganization([]), null);
