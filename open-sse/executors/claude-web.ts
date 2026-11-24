@@ -173,9 +173,10 @@ export function pickClaudeChatOrganization(parsed: unknown, cookieHeader = ""): 
   if (!orgs.length) return null;
   const lastActive = readCookieValue(cookieHeader, "lastActiveOrg");
   const byCookie = lastActive ? orgs.find((o) => o.id === lastActive) : undefined;
-  if (byCookie) return byCookie.id;
+  if (byCookie && byCookie.capabilities.includes("chat")) return byCookie.id;
   const chat = orgs.find((o) => o.capabilities.includes("chat"));
-  return (chat ?? orgs[0]).id;
+  if (chat) return chat.id;
+  return (byCookie ?? orgs[0]).id;
 }
 
 async function getOrganizationId(
