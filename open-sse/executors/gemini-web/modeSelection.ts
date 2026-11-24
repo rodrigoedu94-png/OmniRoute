@@ -109,7 +109,7 @@ export const GEMINI_WEB_MODEL_MODES: Readonly<Record<string, GeminiWebModeDescri
     toggleSelector:
       '[data-test-id="bard-mode-menu-button"], button[aria-haspopup="menu"][aria-label*="model" i]',
     activeIndicatorSelector:
-      '[data-test-id="bard-mode-menu-button"] .mode-title, [data-test-id="bard-mode-menu-button"]',
+      '[data-test-id="bard-mode-menu-button"] .mode-title, [data-test-id="bard-test-id="bard-mode-menu-button"]',
     expectedIndicatorPattern: /\bflash\b(?!.*\blite\b)/i,
   },
   "gemini-3.1-flash-lite": {
@@ -230,7 +230,11 @@ export async function selectGeminiMenuMode(
     return { confirmed: false, reason: "mode_locked", descriptor };
   }
   if (!option.checked) {
-    await page.click(`[data-test-id="${option.testId}"]`, { timeout: timeoutMs });
+    if (!option.testId) {
+      await closeMenu();
+      return { confirmed: false, reason: "control_not_found", descriptor };
+    }
+    await page.click(`[data-test-id=${JSON.stringify(option.testId)}]`, { timeout: timeoutMs });
     await page.waitForTimeout?.(500);
     await page.click(GEMINI_WEB_MODE_MENU_BUTTON, { timeout: timeoutMs });
     option = await readMenuOption(page, sublabel, timeoutMs);
@@ -331,8 +335,8 @@ const REASON_DETAIL: Record<GeminiModeSelectionFailureReason, string> = {
   control_not_found: "the Gemini UI control used to switch modes was not found",
   indicator_not_found: "the active-mode indicator used to confirm the switch was not found",
   indicator_mismatch: "the active-mode indicator did not confirm the switch after attempting it",
-  mode_not_offered: "this account's Gemini mode menu does not offer it",
-  mode_locked: "this account's Gemini plan does not include it (the option is locked)",
+  mode_not_offered: "this account\'s Gemini mode menu does not offer it",
+  mode_locked: "this account\'s Gemini plan does not include it (the option is locked)",
 };
 
 /**

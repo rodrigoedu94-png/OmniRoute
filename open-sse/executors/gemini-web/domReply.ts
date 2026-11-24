@@ -81,6 +81,12 @@ export function readGeminiDomReply(doc?: Document): GeminiDomReplySnapshot {
     }
   };
 
+  const fenceFor = (body: string): string => {
+    const runs = body.match(/`+/g);
+    const maxRun = runs ? Math.max(...runs.map((r) => r.length)) : 0;
+    return "`".repeat(Math.max(3, maxRun + 1));
+  };
+
   const codeBlock = (el: Element): string => {
     const code = el.querySelector("pre code") || el.querySelector("pre") || el;
     const label = el.querySelector(".code-block-decoration span");
@@ -89,7 +95,8 @@ export function readGeminiDomReply(doc?: Document): GeminiDomReplySnapshot {
       .toLowerCase()
       .replace(/[^a-z0-9+#.-]/g, "");
     const body = (code.textContent || "").replace(/\n$/, "");
-    return "```" + lang + "\n" + body + "\n```";
+    const fence = fenceFor(body);
+    return fence + lang + "\n" + body + "\n" + fence;
   };
 
   const block = (node: Node, indent: string): string[] => {
@@ -102,7 +109,11 @@ export function readGeminiDomReply(doc?: Document): GeminiDomReplySnapshot {
     if (SKIP.has(el.tagName) || el.classList.contains("code-block-decoration")) return [];
     const tag = el.tagName;
     if (tag === "CODE-BLOCK") return [codeBlock(el)];
-    if (tag === "PRE") return ["```\n" + (el.textContent || "").replace(/\n$/, "") + "\n```"];
+    if (tag === "PRE") {
+      const body = (el.textContent || "").replace(/\n$/, "");
+      const fence = fenceFor(body);
+      return [fence + "\n" + body + "\n" + fence];
+    }
     if (tag === "P") {
       const t = inline(el).trim();
       return t ? [t] : [];
@@ -120,9 +131,27 @@ export function readGeminiDomReply(doc?: Document): GeminiDomReplySnapshot {
         const nested: string[] = [];
         for (const child of Array.from(li.childNodes)) {
           const childTag = child.nodeType === 1 ? (child as Element).tagName : "";
-          if (childTag === "UL" || childTag === "OL") nested.push(...block(child, indent + "  "));
-          else if (childTag === "P") own.push(inline(child).trim());
-          else own.push(inline(child));
+          if (childTag === "UL" || childTag === "OL") {
+            nested.push(...block(child, indent + "  "));
+          } else if (
+            childTag === "CODE-BLOCK" ||
+            childTag === "PRE" ||
+            childTag === "BLOCKQUOTE" ||
+            childTag === "TABLE"
+          ) {
+            for (const b of block(child, "")) {
+              nested.push(
+                b
+                  .split("\n")
+                  .map((l) => indent + "  " + l)
+                  .join("\n")
+              );
+            }
+          } else if (childTag === "P") {
+            own.push(inline(child).trim());
+          } else {
+            own.push(inline(child));
+          }
         }
         lines.push(indent + marker + own.join(" ").replace(/\s+/g, " ").trim());
         lines.push(...nested);
@@ -184,8 +213,8 @@ export function readGeminiDomReply(doc?: Document): GeminiDomReplySnapshot {
   };
 
   const text = block(panel, "")
+    .map((b) => (/^`{3,}/.test(b) ? b : b.replace(/\n{3,}/g, "\n\n")))
     .join("\n\n")
-    .replace(/\n{3,}/g, "\n\n")
     .trim();
   return {
     queries,
